@@ -34,7 +34,7 @@ class ReservoirManagement(TethysAppBase):
                    controller='reservoir_management.controllers.reportar'
             ),
             UrlMap(name='main_handler',
-                   url='reservoir-management/{site_name}',
+                   url='reservoir-management/sites/{site_name}',
                    controller='reservoir_management.controllers.site_handler'
             ),
             UrlMap(

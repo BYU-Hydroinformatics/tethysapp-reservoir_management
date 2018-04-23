@@ -102,7 +102,7 @@ def gen_urls(request):
 		base=str(current_site);
 	site_urls = list(map((lambda x: {
 		'name':x,
-		'url':request.build_absolute_uri('//' + base + '/apps/reservoir-management/'+x.replace(" ","_")+'/'),
+		'url':request.build_absolute_uri('//' + base + '/apps/reservoir-management/sites/'+x.replace(" ","_")+'/'),
 		'active':x in request.path
 		}
 	), sites))
