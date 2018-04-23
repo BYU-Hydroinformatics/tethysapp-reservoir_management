@@ -20,32 +20,19 @@
 {% block app_navigation_items %}
   {% url 'reservoir_management:home' as home_url %}
   {% url 'reservoir_management:reportar' as reportar_url %}
-  {% url 'reservoir_management:sabana_yegua' as sabana_yegua_url %}
-  {% url 'reservoir_management:hatillo' as hatillo_url %}
-  {% url 'reservoir_management:maguaca' as maguaca_url %}
-  {% url 'reservoir_management:chacuey' as chacuey_url %}
-  {% url 'reservoir_management:jiguey' as jiguey_url %}
-  {% url 'reservoir_management:moncion' as moncion_url %}
-  <!--{% url 'reservoir_management:pinalito' as pinalito_url %}-->
-  {% url 'reservoir_management:rincon' as rincon_url %}
-  {% url 'reservoir_management:sabaneta' as sabaneta_url %}
-  {% url 'reservoir_management:tavera_bao' as tavera_bao_url %}
-  {% url 'reservoir_management:valdesia' as valdesia_url %}
+  {% url 'reservoir_management:main_handler' as main_handler_url %}
+
   <li class="title">Navigacion</li>
   <li class="{% if request.path == home_url %}active{% endif %}"><a href="{{ home_url }}">Mapa</a></li>
-  <li class="{% if request.path == reportar_url %}active{% endif %}"><a href="{{ reportar_url }}">Reportar</a></li>
-  <li class="{% if request.path == chacuey_url %}active{% endif %}"><a href="{{ chacuey_url }}">Chacuey</a></li>
-  <li class="{% if request.path == hatillo_url %}active{% endif %}"><a href="{{ hatillo_url }}">Hatillo</a></li>
-  <li class="{% if request.path == jiguey_url %}active{% endif %}"><a href="{{ jiguey_url }}">Jiguey</a></li>
-  <li class="{% if request.path == maguaca_url %}active{% endif %}"><a href="{{ maguaca_url }}">Maguaca</a></li>
-  <li class="{% if request.path == moncion_url %}active{% endif %}"><a href="{{ moncion_url }}">Moncion</a></li>
-  <!--<li class="{% if request.path == pinalito_url %}active{% endif %}"><a href="{{ pinalito_url }}">Pinalito</a></li>-->
-  <li class="{% if request.path == rincon_url %}active{% endif %}"><a href="{{ rincon_url }}">Rincon</a></li>
-  <li class="{% if request.path == sabaneta_url %}active{% endif %}"><a href="{{ sabaneta_url }}">Sabaneta</a></li>
-  <li class="{% if request.path == sabana_yegua_url %}active{% endif %}"><a href="{{ sabana_yegua_url }}">Sabana Yegua</a></li>
-  <li class="{% if request.path == tavera_bao_url %}active{% endif %}"><a href="{{ tavera_bao_url }}">Tavera-Bao</a></li>
-  <li class="{% if request.path == valdesia_url %}active{% endif %}"><a href="{{ valdesia_url }}">Valdesia</a></li>
-
+  {%if show_edit%}
+    <li class="{% if request.path == reportar_url %}active{% endif %}"><a href="{{ reportar_url }}">Reportar</a></li>
+  {%endif%}
+  {%if site_urls%}
+    {% for site_url in site_urls %}
+      <li class="{% if site_url.active %}active{% endif %}"><a href="{{ site_url.url }}">{{site_url.name}}</a></li>
+    {% endfor %}
+  {%endif%}
+ 
 {% endblock %}
 
 {% block app_content %}

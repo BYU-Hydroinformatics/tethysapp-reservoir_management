@@ -1,5 +1,4 @@
 {% extends "reservoir_management/base.html" %}
-{% load staticfiles %}
 {% load tethys_gizmos %}
 
 {% block import_gizmos %}
@@ -8,7 +7,7 @@
 
 {% block app_content %}
     <div>
-      <h1 align="center">Hatillo</h1>
+      <h1 align="center">{{name}}</h1>
     </div>
     <p><h5>Datos Historicos y Prevision</h5></p>
     {% gizmo timeseries_plot %}
@@ -21,19 +20,20 @@
 {% endblock %}
 
 {% block app_navigation_items %}
-      {{ block.super }}
-    <br>
-    <br>
-    <div class="buttons" align="center">
-        {% gizmo outflow_button %}
-    </div>
+    {{ block.super }}
+    {% if outflow_button %}
+        <br>
+        <br>
+        <div class="buttons" align="center">
+            {% gizmo outflow_button %}
+        </div>
+    {% endif %}
 {% endblock %}
 
 
 {% block after_app_content %}
     <form id="outflowmod" class="modal fade" role="dialog" method="post">
     <div class="modal-dialog">
-        <!-- Modal content-->
         <div class="modal-content">
             <h5 align="center">Ingresar Caudales de Salida</h5>
                 <div id="dimtable">
@@ -45,7 +45,6 @@
                 {% gizmo calculate %}
             </div>
         </div>
-        <!--End modal content-->
     </div>
     </form>
 {% endblock %}

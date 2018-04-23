@@ -1,53 +1,151 @@
 #This is the main python script where your html content is created. search for tethys gizmos online for more information on gizmos
 #Each page has its own function and code that is run for that specific page. Each html page needs its own function
 
-from django.shortcuts import render, reverse, redirect
-from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse, Http404, HttpResponse
-from tethys_sdk.gizmos import *
 import datetime
 import plotly.graph_objs as go
 import os
 import pandas as pd
+
+from django.shortcuts import render, reverse, redirect
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse, Http404, HttpResponse
+from django.contrib.sites.shortcuts import get_current_site
+
+
+from tethys_sdk.gizmos import *
+from tethys_sdk.permissions import has_permission
+
 from model import getforecastflows, gethistoricaldata, getrecentdata, forecastdata, forecastlevels, gettabledates
 from .app import ReservoirManagement as app
 
+sites = ['Chacuey','Hatillo','Jiguey','Maguaca','Moncion','Rincon','Sabaneta','Sabana Yegua','Tavera-Bao','Valdesia']
+
+def config(x):
+    return {
+        'Chacuey':{
+	        'comids':['1396'],
+	        'min_level':47.00,
+	        'max_level':54.63,
+	        'ymin':30,
+	        'custom_history_name':False
+	        },
+        'Hatillo':{
+	        'comids':['834', '813', '849', '857'],
+	        'min_level':70.00,
+	        'max_level':86.50,
+	        'ymin':55,
+	        'custom_history_name':False
+	    },
+        'Jiguey':{
+	        'comids':['475', '496'],
+	        'min_level':500.00,
+	        'max_level':541.50,
+	        'ymin':450,
+	        'custom_history_name':False
+	    },
+        'Maguaca':{
+	        'comids':['1399'],
+	        'min_level':46.70,
+	        'max_level':57.00,
+	        'ymin':30,
+	        'custom_history_name':False
+	    },
+        'Moncion':{
+	        'comids':['1148','1182'],
+	        'min_level':223.00,
+	        'max_level':280.00,
+	        'ymin':180,
+	        'custom_history_name':False
+	    },
+        'Rincon':{
+	        'comids':['853','922'],
+	        'min_level':108.50,
+	        'max_level':122,
+	        'ymin':95,
+	        'custom_history_name':False
+	    },
+        'Sabaneta':{
+	        'comids':['863','862'],
+	        'min_level':612,
+	        'max_level':644,
+	        'ymin':580,
+	        'custom_history_name':False
+	    },
+        'Sabana Yegua':{
+	        'comids':['593','600','599'],
+	        'min_level':358,
+	        'max_level':396.4,
+	        'ymin':350,
+	        'custom_history_name':"S. Yegua"
+	    },
+        'Tavera-Bao':{
+	        'comids':['1024', '1140', '1142', '1153'],
+	        'min_level':300.00,
+	        'max_level':327.50,
+	        'ymin':270,
+	        'custom_history_name':"Tavera"
+	    },
+        'Valdesia':{
+	        'comids':['159'],
+	        'min_level':130.75,
+	        'max_level':150.00,
+	        'ymin':110,
+	        'custom_history_name':False
+	    }
+    }.get(x, {})
+
+def gen_urls(request):
+	current_site = get_current_site(request)
+	site_urls = list(map((lambda x: {
+		'name':x,
+		'url':request.build_absolute_uri('//' + str(current_site) + '/apps/reservoir-management/'+x.replace(" ","_")+'/'),
+		'active':x in request.path
+		}
+	), sites))
+	return site_urls
+
+def edit_passthrough(request,button_to_show):
+	#Can Set output data. Only allowed for admins
+	if(has_permission(request, 'update_data')):
+		return button_to_show;
+	else:
+		return False;
 
 @login_required()
 def home(request):
-    """
-    Controller for the app home page.
-    """
-
-
-
-    context = {
-
-    }
-
-    return render(request, 'reservoir_management/home.html', context)
+    return render(request, 'reservoir_management/home.html', {
+        'site_urls':gen_urls(request),
+        'show_edit':has_permission(request, 'update_data')
+        })
 
 
 @login_required()
-def sabana_yegua(request):
+def site_handler(request,site_name):
     """
-    Controller for the Add Dam page.
+    Main controller for the dams page.
     """
+    gen_urls(request)
+    site_name = site_name.replace('_'," ")
 
-    #this refers to python code in model.py. It uses the stremaflow prediction tool api to get this information.
-    comids = ['593', '600', '599']
-
+    # Get config
+    site_config = config(site_name);
+    comids = site_config['comids'];
     forecasteddata = gettabledates(comids)
-    data = gethistoricaldata('S. Yegua')
 
-    min_level = [[data[0][0], 358.00], [data[-1][0], 358.00]]
-    max_level = [[data[0][0], 396.40], [data[-1][0], 396.4]]
+    historyname = site_name
+    if(site_config['custom_history_name']):
+    	historyname = site_config['custom_history_name'];
+
+    data = gethistoricaldata(historyname)
+
+    min_level = [[data[0][0], site_config['min_level']], [data[-1][0], site_config['min_level']]]
+    max_level = [[data[0][0], site_config['max_level']], [data[-1][0], site_config['max_level']]]
 
     timeseries_plot = TimeSeries(
         height='500px',
         width='500px',
         engine='highcharts',
-        title='Sabana Yequa',
+        title=site_name,
         y_axis_title='Niveles de agua',
         y_axis_units='m',
         series=[
@@ -55,7 +153,7 @@ def sabana_yegua(request):
             {'name': 'Nivel Minimo de Operacion', 'data': min_level, 'type': 'line', 'color': '#660066'},
             {'name': 'Nivel Maximo de Operacion', 'data': max_level, 'type': 'line', 'color': '#FF0000'}
             ],
-        y_min = 350
+        y_min = site_config['ymin']
     )
 
 
@@ -99,13 +197,16 @@ def sabana_yegua(request):
                             classes='outflow_button'
                             )
     context = {
+    	'site_urls':gen_urls(request),
+    	'name':site_name,
         'timeseries_plot': timeseries_plot,
-        'outflow_button': outflow_button,
+        'outflow_button': edit_passthrough(request,outflow_button),
         'calculate': calculate,
         'outflow_edit': outflow_edit,
+        'show_edit':has_permission(request, 'update_data')
     }
 
-    return render(request, 'reservoir_management/sabana_yegua.html', context)
+    return render(request, 'reservoir_management/site_renderer.html', context)
 
 @login_required()
 def reportar(request):
@@ -187,799 +288,18 @@ def reportar(request):
 
 
     context = {
+        'site_urls':gen_urls(request),
         'dam_input': dam_input,
         'level_input':level_input,
         'date_input': date_input,
         'table_view': table_view,
         'message_box': message_box,
         'download_button': download_button,
+        'show_edit':has_permission(request, 'update_data')
+
     }
 
     return render(request, 'reservoir_management/reportar.html', context)
-
-@login_required()
-def hatillo(request):
-    """
-    Controller for the Add Dam page.
-    """
-
-    comids = ['834', '813', '849', '857']
-
-    forecasteddata = gettabledates(comids)
-    data = gethistoricaldata('Hatillo')
-
-    min_level = [[data[0][0], 70.00], [data[-1][0], 70.00]]
-    max_level = [[data[0][0], 86.50], [data[-1][0], 86.50]]
-
-    timeseries_plot = TimeSeries(
-        height='500px',
-        width='500px',
-        engine='highcharts',
-        title='Hatillo',
-        y_axis_title='Niveles de agua',
-        y_axis_units='m',
-        series=[
-            {'name': 'Historico','data': data},
-            {'name': 'Nivel Minimo', 'data': min_level, 'type': 'line', 'color': '#660066'},
-            {'name': 'Nivel Maximo', 'data': max_level, 'type': 'line', 'color': '#FF0000'}
-            ],
-        y_min = 55
-    )
-
-    outflow_edit = TableView(column_names=('Dia', 'Caudal de Salida (cms)', 'Tiempo de salida (horas)'),
-                             rows=[(forecasteddata[0], '0', '0'),
-                                   (forecasteddata[1], '0', '0'),
-                                   (forecasteddata[2], '0', '0'),
-                                   (forecasteddata[3], '0', '0'),
-                                   (forecasteddata[4], '0', '0'),
-                                   (forecasteddata[5], '0', '0'),
-                                   (forecasteddata[6], '0', '0'),
-                                   ],
-                             hover=True,
-                             striped=True,
-                             bordered=True,
-                             condensed=True,
-                             editable_columns=(False, 'Outflow', 'Time'),
-                             row_ids=['day1', 'day2', 'day3', 'day4', 'day5', 'day6', 'day7'],
-                             classes="outflowtable"
-                             )
-
-    calculate = Button(display_text='Calcular Niveles del Embalse',
-                       name='calculate',
-                       style='',
-                       icon='',
-                       href='',
-                       submit=False,
-                       disabled=False,
-                       attributes={"onclick": "calculatelevels()"},
-                       classes='calcbut'
-                       )
-
-    outflow_button = Button(display_text='Ingresar caudales de salida',
-                            name='dimensions',
-                            style='',
-                            icon='',
-                            href='',
-                            submit=False,
-                            disabled=False,
-                            attributes={"onclick": "outflowmodal()"},
-                            classes='outflow_button'
-                            )
-    context = {
-        'timeseries_plot': timeseries_plot,
-        'outflow_button': outflow_button,
-        'calculate': calculate,
-        'outflow_edit': outflow_edit,
-    }
-
-    return render(request, 'reservoir_management/hatillo.html', context)
-
-@login_required()
-def maguaca(request):
-    """
-    Controller for the Add Dam page.
-    """
-    comids = ['1399']
-
-    forecasteddata = gettabledates(comids)
-    data = gethistoricaldata('Maguaca')
-
-    min_level = [[data[0][0], 46.70], [data[-1][0], 46.70]]
-    max_level = [[data[0][0], 57.00], [data[-1][0], 57.00]]
-
-    timeseries_plot = TimeSeries(
-        height='500px',
-        width='500px',
-        engine='highcharts',
-        title='Maguaca',
-        y_axis_title='Niveles de agua',
-        y_axis_units='m',
-        series=[
-            {'name': 'Historico','data': data},
-            {'name': 'Nivel Minimo', 'data': min_level, 'type': 'line', 'color': '#660066'},
-            {'name': 'Nivel Maximo', 'data': max_level, 'type': 'line', 'color': '#FF0000'}
-            ],
-        y_min = 30
-    )
-
-
-    outflow_edit = TableView(column_names=('Dia', 'Caudal de Salida (cms)', 'Tiempo de salida (horas)'),
-                             rows=[(forecasteddata[0], '0', '0'),
-                                   (forecasteddata[1], '0', '0'),
-                                   (forecasteddata[2], '0', '0'),
-                                   (forecasteddata[3], '0', '0'),
-                                   (forecasteddata[4], '0', '0'),
-                                   (forecasteddata[5], '0', '0'),
-                                   (forecasteddata[6], '0', '0'),
-                                   ],
-                             hover=True,
-                             striped=True,
-                             bordered=True,
-                             condensed=True,
-                             editable_columns=(False, 'Outflow', 'Time'),
-                             row_ids=['day1', 'day2', 'day3', 'day4', 'day5', 'day6', 'day7'],
-                             classes="outflowtable"
-                             )
-
-    calculate = Button(display_text='Calcular Niveles del Embalse',
-                       name='calculate',
-                       style='',
-                       icon='',
-                       href='',
-                       submit=False,
-                       disabled=False,
-                       attributes={"onclick": "calculatelevels()"},
-                       classes='calcbut'
-                       )
-
-    outflow_button = Button(display_text='Ingresar caudales de salida',
-                            name='dimensions',
-                            style='',
-                            icon='',
-                            href='',
-                            submit=False,
-                            disabled=False,
-                            attributes={"onclick": "outflowmodal()"},
-                            classes='outflow_button'
-                            )
-    context = {
-        'timeseries_plot': timeseries_plot,
-        'outflow_button': outflow_button,
-        'calculate': calculate,
-        'outflow_edit': outflow_edit,
-    }
-
-
-    return render(request, 'reservoir_management/maguaca.html', context)
-
-@login_required()
-def chacuey(request):
-    """
-    Controller for the Add Dam page.
-    """
-
-    comids = ['1396']
-
-    forecasteddata = gettabledates(comids)
-    data = gethistoricaldata('Chacuey')
-
-    min_level = [[data[0][0], 47.00], [data[-1][0], 47.00]]
-    max_level = [[data[0][0], 54.63], [data[-1][0], 54.63]]
-
-    timeseries_plot = TimeSeries(
-        height='500px',
-        width='500px',
-        engine='highcharts',
-        title='Chacuey',
-        y_axis_title='Niveles de agua',
-        y_axis_units='m',
-        series=[
-            {'name': 'Historico','data': data},
-            {'name': 'Nivel Minimo', 'data': min_level, 'type': 'line', 'color': '#660066'},
-            {'name': 'Nivel Maximo', 'data': max_level, 'type': 'line', 'color': '#FF0000'}
-            ],
-        y_min = 30
-    )
-
-
-    outflow_edit = TableView(column_names=('Dia', 'Caudal de Salida (cms)', 'Tiempo de salida (horas)'),
-                             rows=[(forecasteddata[0], '0', '0'),
-                                   (forecasteddata[1], '0', '0'),
-                                   (forecasteddata[2], '0', '0'),
-                                   (forecasteddata[3], '0', '0'),
-                                   (forecasteddata[4], '0', '0'),
-                                   (forecasteddata[5], '0', '0'),
-                                   (forecasteddata[6], '0', '0'),
-                                   ],
-                             hover=True,
-                             striped=True,
-                             bordered=True,
-                             condensed=True,
-                             editable_columns=(False, 'Outflow', 'Time'),
-                             row_ids = ['day1', 'day2', 'day3', 'day4', 'day5', 'day6','day7'],
-                             classes = "outflowtable"
-                             )
-
-    calculate = Button(display_text='Calcular Niveles del Embalse',
-                       name='calculate',
-                       style='',
-                       icon='',
-                       href='',
-                       submit=False,
-                       disabled=False,
-                       attributes={"onclick": "calculatelevels()"},
-                       classes='calcbut'
-                       )
-
-    outflow_button = Button(display_text='Ingresar caudales de salida',
-                            name='dimensions',
-                            style='',
-                            icon='',
-                            href='',
-                            submit=False,
-                            disabled=False,
-                            attributes={"onclick": "outflowmodal()"},
-                            classes='outflow_button'
-                            )
-    context = {
-        'timeseries_plot': timeseries_plot,
-        'outflow_button':outflow_button,
-        'calculate': calculate,
-        'outflow_edit': outflow_edit,
-    }
-
-
-
-    return render(request, 'reservoir_management/chacuey.html', context)
-
-@login_required()
-def jiguey(request):
-    """
-    Controller for the Add Dam page.
-    """
-    comids = ['475', '496']
-
-    forecasteddata = gettabledates(comids)
-    data = gethistoricaldata('Jiguey')
-
-    min_level = [[data[0][0], 500.00], [data[-1][0], 500.00]]
-    max_level = [[data[0][0], 541.50], [data[-1][0], 541.50]]
-
-    timeseries_plot = TimeSeries(
-        height='500px',
-        width='500px',
-        engine='highcharts',
-        title='Jiguey',
-        y_axis_title='Niveles de agua',
-        y_axis_units='m',
-        series=[
-            {'name': 'Historico','data': data},
-            {'name': 'Nivel Minimo', 'data': min_level, 'type': 'line', 'color': '#660066'},
-            {'name': 'Nivel Maximo', 'data': max_level, 'type': 'line', 'color': '#FF0000'}
-            ],
-        y_min = 450
-    )
-
-
-    outflow_edit = TableView(column_names=('Dia', 'Caudal de Salida (cms)', 'Tiempo de salida (horas)'),
-                             rows=[(forecasteddata[0], '0', '0'),
-                                   (forecasteddata[1], '0', '0'),
-                                   (forecasteddata[2], '0', '0'),
-                                   (forecasteddata[3], '0', '0'),
-                                   (forecasteddata[4], '0', '0'),
-                                   (forecasteddata[5], '0', '0'),
-                                   (forecasteddata[6], '0', '0'),
-                                   ],
-                             hover=True,
-                             striped=True,
-                             bordered=True,
-                             condensed=True,
-                             editable_columns=(False, 'Outflow', 'Time'),
-                             row_ids=['day1', 'day2', 'day3', 'day4', 'day5', 'day6', 'day7'],
-                             classes="outflowtable"
-                             )
-
-    calculate = Button(display_text='Calcular Niveles del Embalse',
-                       name='calculate',
-                       style='',
-                       icon='',
-                       href='',
-                       submit=False,
-                       disabled=False,
-                       attributes={"onclick": "calculatelevels()"},
-                       classes='calcbut'
-                       )
-
-    outflow_button = Button(display_text='Ingresar caudales de salida',
-                            name='dimensions',
-                            style='',
-                            icon='',
-                            href='',
-                            submit=False,
-                            disabled=False,
-                            attributes={"onclick": "outflowmodal()"},
-                            classes='outflow_button'
-                            )
-    context = {
-        'timeseries_plot': timeseries_plot,
-        'outflow_button': outflow_button,
-        'calculate': calculate,
-        'outflow_edit': outflow_edit,
-    }
-
-
-    return render(request, 'reservoir_management/jiguey.html', context)
-
-@login_required()
-def moncion(request):
-    """
-    Controller for the Add Dam page.
-    """
-    comids = ['1148', '1182']
-
-    data = gethistoricaldata('Moncion')
-    forecasteddata = gettabledates(comids)
-
-    min_level = [[data[0][0], 223.00], [data[-1][0], 223.00]]
-    max_level = [[data[0][0], 280.00], [data[-1][0], 280.00]]
-
-    timeseries_plot = TimeSeries(
-        height='500px',
-        width='500px',
-        engine='highcharts',
-        title='Moncion',
-        y_axis_title='Niveles de agua',
-        y_axis_units='m',
-        series=[
-            {'name': 'Historico','data': data},
-            {'name': 'Nivel Minimo', 'data': min_level, 'type': 'line', 'color': '#660066'},
-            {'name': 'Nivel Maximo', 'data': max_level, 'type': 'line', 'color': '#FF0000'}
-            ],
-        y_min = 180
-    )
-
-
-    outflow_edit = TableView(column_names=('Dia', 'Caudal de Salida (cms)', 'Tiempo de salida (horas)'),
-                             rows=[(forecasteddata[0], '0', '0'),
-                                   (forecasteddata[1], '0', '0'),
-                                   (forecasteddata[2], '0', '0'),
-                                   (forecasteddata[3], '0', '0'),
-                                   (forecasteddata[4], '0', '0'),
-                                   (forecasteddata[5], '0', '0'),
-                                   (forecasteddata[6], '0', '0'),
-                                   ],
-                             hover=True,
-                             striped=True,
-                             bordered=True,
-                             condensed=True,
-                             editable_columns=(False, 'Outflow', 'Time'),
-                             row_ids=['day1', 'day2', 'day3', 'day4', 'day5', 'day6', 'day7'],
-                             classes="outflowtable"
-                             )
-
-    calculate = Button(display_text='Calcular Niveles del Embalse',
-                       name='calculate',
-                       style='',
-                       icon='',
-                       href='',
-                       submit=False,
-                       disabled=False,
-                       attributes={"onclick": "calculatelevels()"},
-                       classes='calcbut'
-                       )
-
-    outflow_button = Button(display_text='Ingresar caudales de salida',
-                            name='dimensions',
-                            style='',
-                            icon='',
-                            href='',
-                            submit=False,
-                            disabled=False,
-                            attributes={"onclick": "outflowmodal()"},
-                            classes='outflow_button'
-                            )
-    context = {
-        'timeseries_plot': timeseries_plot,
-        'outflow_button': outflow_button,
-        'calculate': calculate,
-        'outflow_edit': outflow_edit,
-    }
-
-    return render(request, 'reservoir_management/moncion.html', context)
-
-@login_required()
-def pinalito(request):
-    """
-    Controller for the Add Dam page.
-    """
-    comids = ['790']
-
-    forecastinfo = getforecastflows(comids)
-    data = gethistoricaldata('Pinalito')
-
-    timeseries_plot = TimeSeries(
-        height='500px',
-        width='500px',
-        engine='highcharts',
-        title='Pinalito',
-        y_axis_title='Niveles de agua',
-        y_axis_units='m',
-        series=[{
-            'name': 'Historico',
-            'data': data
-        }],
-        y_min = 1160
-    )
-
-    #This creates the table
-    table_view = TableView(column_names=('Caudales/Niveles',forecastinfo['timestep'][0], forecastinfo['timestep'][1], forecastinfo['timestep'][2], forecastinfo['timestep'][3], forecastinfo['timestep'][4], forecastinfo['timestep'][5], forecastinfo['timestep'][6]),
-                           rows=[('Caudal de Entrada (Total)',forecastinfo['total'][0], forecastinfo['total'][1], forecastinfo['total'][2],forecastinfo['total'][3],forecastinfo['total'][4],forecastinfo['total'][5],forecastinfo['total'][6]),
-                                 ('Caudal de Entrada (790)', forecastinfo['790'][0], forecastinfo['790'][1], forecastinfo['790'][2], forecastinfo['790'][3],
-                                  forecastinfo['790'][4], forecastinfo['790'][5], forecastinfo['790'][6]),
-                                 ('Niveles','368', '370', '369', '374','373','371','372')],
-                           hover=True,
-                           striped=True,
-                           bordered=True,
-                           condensed=False)
-
-    outflow_edit = TableView(column_names=('Dia', 'Caudal de Salida (cms)', 'Tiempo de salida (horas)'),
-                             rows=[(forecasteddata['dates'][0], '0', '0'),
-                                   (forecasteddata['dates'][1], '0', '0'),
-                                   (forecasteddata['dates'][2], '0', '0'),
-                                   (forecasteddata['dates'][3], '0', '0'),
-                                   (forecasteddata['dates'][4], '0', '0'),
-                                   (forecasteddata['dates'][5], '0', '0'),
-                                   (forecasteddata['dates'][6], '0', '0'),
-                                   ],
-                             hover=True,
-                             striped=True,
-                             bordered=True,
-                             condensed=True,
-                             editable_columns=(False, 'Outflow', 'Time'),
-                             row_ids=['day1', 'day2', 'day3', 'day4', 'day5', 'day6', 'day7'],
-                             classes="outflowtable"
-                             )
-
-    calculate = Button(display_text='Calcular Niveles del Embalse',
-                       name='calculate',
-                       style='',
-                       icon='',
-                       href='',
-                       submit=False,
-                       disabled=False,
-                       attributes={"onclick": "calculatelevels()"},
-                       classes='calcbut'
-                       )
-
-    outflow_button = Button(display_text='Ingresar caudales de salida',
-                            name='dimensions',
-                            style='',
-                            icon='',
-                            href='',
-                            submit=False,
-                            disabled=False,
-                            attributes={"onclick": "outflowmodal()"},
-                            classes='outflow_button'
-                            )
-    context = {
-        'timeseries_plot': timeseries_plot,
-        'table_view': table_view,
-        'outflow_button': outflow_button,
-        'calculate': calculate,
-        'outflow_edit': outflow_edit,
-    }
-
-
-    return render(request, 'reservoir_management/pinalito.html', context)
-
-@login_required()
-def rincon(request):
-    """
-    Controller for the Add Dam page.
-    """
-    comids = ['853', '922']
-
-    forecasteddata = gettabledates(comids)
-    data = gethistoricaldata('Rincon')
-
-    min_level = [[data[0][0], 108.50], [data[-1][0], 108.50]]
-    max_level = [[data[0][0], 122.00], [data[-1][0], 122.00]]
-
-    timeseries_plot = TimeSeries(
-        height='500px',
-        width='500px',
-        engine='highcharts',
-        title='Rincon',
-        y_axis_title='Niveles de agua',
-        y_axis_units='m',
-        series=[
-            {'name': 'Historico','data': data},
-            {'name': 'Nivel Minimo', 'data': min_level, 'type': 'line', 'color': '#660066'},
-            {'name': 'Nivel Maximo', 'data': max_level, 'type': 'line', 'color': '#FF0000'}
-            ],
-        y_min = 95
-    )
-
-
-    outflow_edit = TableView(column_names=('Dia', 'Caudal de Salida (cms)', 'Tiempo de salida (horas)'),
-                             rows=[(forecasteddata[0], '0', '0'),
-                                   (forecasteddata[1], '0', '0'),
-                                   (forecasteddata[2], '0', '0'),
-                                   (forecasteddata[3], '0', '0'),
-                                   (forecasteddata[4], '0', '0'),
-                                   (forecasteddata[5], '0', '0'),
-                                   (forecasteddata[6], '0', '0'),
-                                   ],
-                             hover=True,
-                             striped=True,
-                             bordered=True,
-                             condensed=True,
-                             editable_columns=(False, 'Outflow', 'Time'),
-                             row_ids=['day1', 'day2', 'day3', 'day4', 'day5', 'day6', 'day7'],
-                             classes="outflowtable"
-                             )
-
-    calculate = Button(display_text='Calcular Niveles del Embalse',
-                       name='calculate',
-                       style='',
-                       icon='',
-                       href='',
-                       submit=False,
-                       disabled=False,
-                       attributes={"onclick": "calculatelevels()"},
-                       classes='calcbut'
-                       )
-
-    outflow_button = Button(display_text='Ingresar caudales de salida',
-                            name='dimensions',
-                            style='',
-                            icon='',
-                            href='',
-                            submit=False,
-                            disabled=False,
-                            attributes={"onclick": "outflowmodal()"},
-                            classes='outflow_button'
-                            )
-    context = {
-        'timeseries_plot': timeseries_plot,
-        'outflow_button': outflow_button,
-        'calculate': calculate,
-        'outflow_edit': outflow_edit,
-    }
-
-
-    return render(request, 'reservoir_management/rincon.html', context)
-
-@login_required()
-def sabaneta(request):
-    """
-    Controller for the Add Dam page.
-    """
-    comids = ['863', '862']
-
-    forecasteddata = gettabledates(comids)
-    data = gethistoricaldata('Sabaneta')
-
-    min_level = [[data[0][0], 612.00], [data[-1][0], 612.00]]
-    max_level = [[data[0][0], 644.00], [data[-1][0], 644.00]]
-
-    timeseries_plot = TimeSeries(
-        height='500px',
-        width='500px',
-        engine='highcharts',
-        title='Sabaneta',
-        y_axis_title='Niveles de agua',
-        y_axis_units='m',
-        series=[
-            {'name': 'Historico','data': data},
-            {'name': 'Nivel Minimo', 'data': min_level, 'type': 'line', 'color': '#660066'},
-            {'name': 'Nivel Maximo', 'data': max_level, 'type': 'line', 'color': '#FF0000'}
-            ],
-        y_min = 580
-    )
-
-    outflow_edit = TableView(column_names=('Dia', 'Caudal de Salida (cms)', 'Tiempo de salida (horas)'),
-                             rows=[(forecasteddata[0], '0', '0'),
-                                   (forecasteddata[1], '0', '0'),
-                                   (forecasteddata[2], '0', '0'),
-                                   (forecasteddata[3], '0', '0'),
-                                   (forecasteddata[4], '0', '0'),
-                                   (forecasteddata[5], '0', '0'),
-                                   (forecasteddata[6], '0', '0'),
-                                   ],
-                             hover=True,
-                             striped=True,
-                             bordered=True,
-                             condensed=True,
-                             editable_columns=(False, 'Outflow', 'Time'),
-                             row_ids=['day1', 'day2', 'day3', 'day4', 'day5', 'day6', 'day7'],
-                             classes="outflowtable"
-                             )
-
-    calculate = Button(display_text='Calcular Niveles del Embalse',
-                       name='calculate',
-                       style='',
-                       icon='',
-                       href='',
-                       submit=False,
-                       disabled=False,
-                       attributes={"onclick": "calculatelevels()"},
-                       classes='calcbut'
-                       )
-
-    outflow_button = Button(display_text='Ingresar caudales de salida',
-                            name='dimensions',
-                            style='',
-                            icon='',
-                            href='',
-                            submit=False,
-                            disabled=False,
-                            attributes={"onclick": "outflowmodal()"},
-                            classes='outflow_button'
-                            )
-    context = {
-        'timeseries_plot': timeseries_plot,
-        'outflow_button': outflow_button,
-        'calculate': calculate,
-        'outflow_edit': outflow_edit,
-    }
-
-    return render(request, 'reservoir_management/sabaneta.html', context)
-
-@login_required()
-def tavera_bao(request):
-    """
-    Controller for the Add Dam page.
-    """
-    comids = ['1024', '1140', '1142', '1153']
-
-    forecasteddata = gettabledates(comids)
-    data = gethistoricaldata('Tavera')
-
-    min_level = [[data[0][0], 300.00], [data[-1][0], 300.00]]
-    max_level = [[data[0][0], 327.50], [data[-1][0], 327.50]]
-
-    timeseries_plot = TimeSeries(
-        height='500px',
-        width='500px',
-        engine='highcharts',
-        title='Tavera-Bao',
-        y_axis_title='Niveles de agua',
-        y_axis_units='m',
-        series=[
-            {'name': 'Historico','data': data},
-            {'name': 'Nivel Minimo', 'data': min_level, 'type': 'line', 'color': '#660066'},
-            {'name': 'Nivel Maximo', 'data': max_level, 'type': 'line', 'color': '#FF0000'}
-            ],
-        y_min = 270
-    )
-
-
-
-    outflow_edit = TableView(column_names=('Dia', 'Caudal de Salida (cms)', 'Tiempo de salida (horas)'),
-                             rows=[(forecasteddata[0], '0', '0'),
-                                   (forecasteddata[1], '0', '0'),
-                                   (forecasteddata[2], '0', '0'),
-                                   (forecasteddata[3], '0', '0'),
-                                   (forecasteddata[4], '0', '0'),
-                                   (forecasteddata[5], '0', '0'),
-                                   (forecasteddata[6], '0', '0'),
-                                   ],
-                             hover=True,
-                             striped=True,
-                             bordered=True,
-                             condensed=True,
-                             editable_columns=(False, 'Outflow', 'Time'),
-                             row_ids=['day1', 'day2', 'day3', 'day4', 'day5', 'day6', 'day7'],
-                             classes="outflowtable"
-                             )
-
-    calculate = Button(display_text='Calcular Niveles del Embalse',
-                       name='calculate',
-                       style='',
-                       icon='',
-                       href='',
-                       submit=False,
-                       disabled=False,
-                       attributes={"onclick": "calculatelevels()"},
-                       classes='calcbut'
-                       )
-
-    outflow_button = Button(display_text='Ingresar caudales de salida',
-                            name='dimensions',
-                            style='',
-                            icon='',
-                            href='',
-                            submit=False,
-                            disabled=False,
-                            attributes={"onclick": "outflowmodal()"},
-                            classes='outflow_button'
-                            )
-    context = {
-        'timeseries_plot': timeseries_plot,
-        'outflow_button': outflow_button,
-        'calculate': calculate,
-        'outflow_edit': outflow_edit,
-    }
-
-    return render(request, 'reservoir_management/tavera_bao.html', context)
-
-@login_required()
-def valdesia(request):
-    """
-    Controller for the Add Dam page.
-    """
-    comids = ['159']
-
-    forecasteddata = gettabledates(comids)
-    data = gethistoricaldata('Valdesia')
-
-    min_level = [[data[0][0], 130.75], [data[-1][0], 130.75]]
-    max_level = [[data[0][0], 150.00], [data[-1][0], 150.00]]
-
-    timeseries_plot = TimeSeries(
-        height='500px',
-        width='500px',
-        engine='highcharts',
-        title='Valdesia',
-        y_axis_title='Niveles de agua',
-        y_axis_units='m',
-        series=[
-            {'name': 'Historico','data': data},
-            {'name': 'Nivel Minimo', 'data': min_level, 'type': 'line', 'color': '#660066'},
-            {'name': 'Nivel Maximo', 'data': max_level, 'type': 'line', 'color': '#FF0000'}
-            ],
-        y_min = 110
-    )
-
-
-    outflow_edit = TableView(column_names=('Dia', 'Caudal de Salida (cms)', 'Tiempo de salida (horas)'),
-                             rows=[(forecasteddata[0], '0', '0'),
-                                   (forecasteddata[1], '0', '0'),
-                                   (forecasteddata[2], '0', '0'),
-                                   (forecasteddata[3], '0', '0'),
-                                   (forecasteddata[4], '0', '0'),
-                                   (forecasteddata[5], '0', '0'),
-                                   (forecasteddata[6], '0', '0'),
-                                   ],
-                             hover=True,
-                             striped=True,
-                             bordered=True,
-                             condensed=True,
-                             editable_columns=(False, 'Outflow', 'Time'),
-                             row_ids=['day1', 'day2', 'day3', 'day4', 'day5', 'day6', 'day7'],
-                             classes="outflowtable"
-                             )
-
-    calculate = Button(display_text='Calcular Niveles del Embalse',
-                       name='calculate',
-                       style='',
-                       icon='',
-                       href='',
-                       submit=False,
-                       disabled=False,
-                       attributes={"onclick": "calculatelevels()"},
-                       classes='calcbut'
-                       )
-
-    outflow_button = Button(display_text='Ingresar caudales de salida',
-                            name='dimensions',
-                            style='',
-                            icon='',
-                            href='',
-                            submit=False,
-                            disabled=False,
-                            attributes={"onclick": "outflowmodal()"},
-                            classes='outflow_button'
-                            )
-    context = {
-        'timeseries_plot': timeseries_plot,
-        'outflow_button': outflow_button,
-        'calculate': calculate,
-        'outflow_edit': outflow_edit,
-    }
-
-    return render(request, 'reservoir_management/valdesia.html', context)
 
 def get_forecast_curve(request):
     get_data = request.GET

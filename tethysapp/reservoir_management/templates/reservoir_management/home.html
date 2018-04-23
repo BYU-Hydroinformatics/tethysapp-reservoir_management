@@ -2,7 +2,6 @@
 functionality, then add javascript or python code. -->
 
 {% extends "reservoir_management/base.html" %}
-{% load tethys_gizmos staticfiles %}
 
 {% block app_content %}
     <div id="map" class="map"></div>
@@ -10,12 +9,4 @@ functionality, then add javascript or python code. -->
       <a href="#" id="popup-closer" class="ol-popup-closer"></a>
       <div id="popup-content"></div>
     </div>
-
-{% endblock %}
-
-
-
-{% block styles %}
-    {{ block.super }}
-    <link href="{% static 'reservoir_management/css/map.css' %}" rel="stylesheet"/>
 {% endblock %}
