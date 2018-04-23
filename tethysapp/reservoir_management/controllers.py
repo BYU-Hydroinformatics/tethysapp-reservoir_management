@@ -96,10 +96,10 @@ def config(x):
 
 def gen_urls(request):
 	current_site = get_current_site(request)
-    if(settings.FORCE_SCRIPT_NAME):
-        base=settings.FORCE_SCRIPT_NAME
-    else:
-        base="";
+	if(settings.FORCE_SCRIPT_NAME):
+		base=settings.FORCE_SCRIPT_NAME
+	else:
+		base="";
 	site_urls = list(map((lambda x: {
 		'name':x,
 		'url':request.build_absolute_uri('//' + base + str(current_site) + '/apps/reservoir-management/'+x.replace(" ","_")+'/'),
