@@ -10,7 +10,7 @@ from django.shortcuts import render, reverse, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, Http404, HttpResponse
 from django.contrib.sites.shortcuts import get_current_site
-
+from django.conf import settings
 
 from tethys_sdk.gizmos import *
 from tethys_sdk.permissions import has_permission
@@ -96,9 +96,13 @@ def config(x):
 
 def gen_urls(request):
 	current_site = get_current_site(request)
+    if(settings.FORCE_SCRIPT_NAME):
+        base=settings.FORCE_SCRIPT_NAME
+    else:
+        base="";
 	site_urls = list(map((lambda x: {
 		'name':x,
-		'url':request.build_absolute_uri('//' + str(current_site) + '/apps/reservoir-management/'+x.replace(" ","_")+'/'),
+		'url':request.build_absolute_uri('//' + base + str(current_site) + '/apps/reservoir-management/'+x.replace(" ","_")+'/'),
 		'active':x in request.path
 		}
 	), sites))
