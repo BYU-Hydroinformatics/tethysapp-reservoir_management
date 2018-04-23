@@ -13,7 +13,7 @@ var layers,
     map_events;
 
 var staticPath = baseStatic;
-var apiServer = `${staticPath.replace('\/static','\/apps').replace('_','-')}`;
+var apiServer = `${staticPath.replace('\/static','\/apps').replace('reservoir_management','reservoir-management')}`;
 /*this function creates the base map on the home page*/
 function init_map() {
 
